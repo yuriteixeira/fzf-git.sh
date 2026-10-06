@@ -262,6 +262,34 @@ EOF
     cut -c4- | sed 's/.* -> //'
 }
 
+_fzf_git_unstaged_files() {
+  _fzf_git_check || return
+  local query extract_file_name add_selected_files
+  [[ -n "$(git rev-parse --show-prefix)" ]] && query='!../ '
+
+  read -r -d "" extract_file_name <<'EOF'
+"$(cut -c4- <<< {} | sed 's/.* -> //;s/^"//;s/"$//;s/\\"/"/g')"
+EOF
+
+  read -r -d "" add_selected_files <<'EOF'
+for file in {+}; do
+  git add -- "$(cut -c4- <<< "$file" | sed 's/.* -> //;s/^"//;s/"$//;s/\\"/"/g')"
+done
+EOF
+
+  # Check the worktree status column without changing the colored output.
+  git -c core.quotePath=false -c color.status=$(__fzf_git_color) status --short --no-branch --untracked-files=all |
+    awk '{ line = $0; gsub(/\033\[[0-9;]*m/, "", line); if (substr(line, 2, 1) != " ") print }' |
+    _fzf_git_fzf -m --ansi --nth 2..,.. \
+      --border-label '📁 Unstaged files ' \
+      --header "$(__fzf_git_key_label "${FZF_GIT_KEY_ADD:-ctrl-s}") (git add) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_OPEN_EDITOR:-alt-e}") (open in editor)" \
+      --bind "${FZF_GIT_KEY_ADD:-ctrl-s}:execute:$add_selected_files" \
+      --bind "${FZF_GIT_KEY_OPEN_EDITOR:-alt-e}:execute:${EDITOR:-vim} $extract_file_name" \
+      --query "$query" \
+      --preview "git -c core.quotePath=false diff --no-ext-diff --color=$(__fzf_git_color .) -- $extract_file_name | $(__fzf_git_pager); $(__fzf_git_cat) $extract_file_name" "$@" |
+    cut -c4- | sed 's/.* -> //'
+}
+
 _fzf_git_tree_files() {
   _fzf_git_check || return
 

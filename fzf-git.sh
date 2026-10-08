@@ -59,6 +59,61 @@ __fzf_git_key_label() {
   printf '%s' "$1" | tr '[:lower:]' '[:upper:]'
 }
 
+# Internal listing functions - used by both fzf-git.sh and fzf-git
+__fzf_git_list_branches() {
+  echo "$(__fzf_git_key_label "${FZF_GIT_KEY_OPEN_BROWSER:-ctrl-o}") (open in browser) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_SHOW_ALL:-alt-a}") (show all branches)"
+  echo "$(__fzf_git_key_label "${FZF_GIT_KEY_LIST_HASHES:-alt-h}") (list commit hashes)"
+  __fzf_git_branch_data "$@"
+}
+
+__fzf_git_list_all_branches() {
+  echo "$(__fzf_git_key_label "${FZF_GIT_KEY_OPEN_BROWSER:-ctrl-o}") (open in browser) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_ACCEPT_WITHOUT_REMOTE:-alt-enter}") (accept without remote)"
+  echo "$(__fzf_git_key_label "${FZF_GIT_KEY_LIST_HASHES:-alt-h}") (list commit hashes)"
+  __fzf_git_branch_data -a "$@"
+}
+
+__fzf_git_list_hashes() {
+  echo "$(__fzf_git_key_label "${FZF_GIT_KEY_OPEN_BROWSER:-ctrl-o}") (open in browser) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_SHOW_DIFF:-ctrl-d}") (diff) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_TOGGLE_SORT:-ctrl-s}") (toggle sort)"
+  echo "$(__fzf_git_key_label "${FZF_GIT_KEY_TOGGLE_RAW:-alt-r}") (toggle raw mode) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_LIST_FILES:-alt-f}") (list files) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_SHOW_ALL:-alt-a}") (show all hashes)"
+  __fzf_git_hash_data "$@" "$LIST_OPTS"
+}
+
+__fzf_git_list_all_hashes() {
+  echo "$(__fzf_git_key_label "${FZF_GIT_KEY_OPEN_BROWSER:-ctrl-o}") (open in browser) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_SHOW_DIFF:-ctrl-d}") (diff)"
+  echo "$(__fzf_git_key_label "${FZF_GIT_KEY_TOGGLE_SORT:-ctrl-s}") (toggle sort) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_LIST_FILES:-alt-f}") (list files)"
+  __fzf_git_hash_data --all "$@"
+}
+
+__fzf_git_list_refs() {
+  echo "$(__fzf_git_key_label "${FZF_GIT_KEY_OPEN_BROWSER:-ctrl-o}") (open in browser) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_OPEN_EDITOR:-alt-e}") (examine in editor) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_SHOW_ALL:-alt-a}") (show all refs)"
+  __fzf_git_ref_data --exclude='refs/remotes' "$@"
+}
+
+__fzf_git_list_all_refs() {
+  echo "$(__fzf_git_key_label "${FZF_GIT_KEY_OPEN_BROWSER:-ctrl-o}") (open in browser) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_OPEN_EDITOR:-alt-e}") (examine in editor) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_ACCEPT_WITHOUT_REMOTE:-alt-enter}") (accept without remote)"
+  __fzf_git_ref_data "$@"
+}
+
+# Internal data functions - contain the actual git commands
+__fzf_git_branch_data() {
+  git branch "$@" --sort=-committerdate --sort=-HEAD --format=$'%(HEAD) %(color:yellow)%(refname:short) %(color:green)(%(committerdate:relative))\t%(color:blue)%(subject)%(color:reset)' --color=$(__fzf_git_color) | column -ts$'\t'
+}
+
+__fzf_git_ref_data() {
+  git for-each-ref "$@" --sort=-creatordate --sort=-HEAD --color=$(__fzf_git_color) --format=$'%(if:equals=refs/remotes)%(refname:rstrip=-2)%(then)%(color:magenta)remote-branch%(else)%(if:equals=refs/heads)%(refname:rstrip=-2)%(then)%(color:brightgreen)branch%(else)%(if:equals=refs/tags)%(refname:rstrip=-2)%(then)%(color:brightcyan)tag%(else)%(if:equals=refs/stash)%(refname:rstrip=-2)%(then)%(color:brightred)stash%(else)%(color:white)%(refname:rstrip=-2)%(end)%(end)%(end)%(end)\t%(color:yellow)%(refname:short) %(color:green)(%(creatordate:relative))\t%(color:blue)%(subject)%(color:reset)' | column -ts$'\t'
+}
+
+__fzf_git_hash_data() {
+  local list_opts="$2"
+  shift
+  # Only append list_opts if it is set and non-empty
+  if [[ -n "${list_opts:-}" ]]; then
+    git log --date=short --format="%C(green)%C(bold)%cd %C(auto)%h%d %s (%an)" --graph --color=$(__fzf_git_color) "$@" "$list_opts"
+  else
+    git log --date=short --format="%C(green)%C(bold)%cd %C(auto)%h%d %s (%an)" --graph --color=$(__fzf_git_color) "$@"
+  fi
+}
+
 __fzf_git_launcher_prefix() {
   printf '%s' "${FZF_GIT_LAUNCHER_PREFIX:-g}"
 }
@@ -217,8 +272,7 @@ _fzf_git_tree_files() {
 _fzf_git_branches() {
   _fzf_git_check || return
 
-  "$__fzf_git" --list branches |
-  __fzf_git_fzf=$(declare -f _fzf_git_fzf) _fzf_git_fzf --ansi \
+  __fzf_git_list_branches | _fzf_git_fzf --ansi \
     --border-label '🌲 Branches ' \
     --header-lines 2 \
     --tiebreak begin \
@@ -247,8 +301,7 @@ _fzf_git_tags() {
 
 _fzf_git_hashes() {
   _fzf_git_check || return
-  "$__fzf_git" --list hashes |
-  _fzf_git_fzf --ansi --no-sort --bind "${FZF_GIT_KEY_TOGGLE_SORT:-ctrl-s}:toggle-sort,${FZF_GIT_KEY_TOGGLE_RAW:-alt-r}:toggle-raw" \
+  __fzf_git_list_hashes | _fzf_git_fzf --ansi --no-sort --bind "${FZF_GIT_KEY_TOGGLE_SORT:-ctrl-s}:toggle-sort,${FZF_GIT_KEY_TOGGLE_RAW:-alt-r}:toggle-raw" \
     --border-label '🍡 Hashes ' \
     --header-lines 2 \
     --bind "${FZF_GIT_KEY_OPEN_BROWSER:-ctrl-o}:execute-silent:\"$__fzf_git\" --list commit {}" \
@@ -309,7 +362,7 @@ _fzf_git_lreflogs() {
 
 _fzf_git_each_ref() {
   _fzf_git_check || return
-  "$__fzf_git" --list refs | _fzf_git_fzf --ansi \
+  __fzf_git_list_refs | _fzf_git_fzf --ansi \
     --nth 2,2.. \
     --tiebreak begin \
     --border-label '☘️  Each ref ' \

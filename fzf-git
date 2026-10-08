@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+# The MIT License (MIT)
+#
+# Copyright (c) 2026 Yuri Pereira Teixeira
+# Copyright (c) 2024 Junegunn Choi
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
+# Load the library of functions that lives next to this script
+__fzf_git_library=$(dirname "$(readlink -f "${BASH_SOURCE[0]}" 2> /dev/null)")
+. "$__fzf_git_library/fzf-git.sh"
+
+if [[ $1 == --list ]]; then
+  shift
+  if [[ $# -eq 1 ]]; then
+    branches() {
+      git branch "$@" --sort=-committerdate --sort=-HEAD --format=$'%(HEAD) %(color:yellow)%(refname:short) %(color:green)(%(committerdate:relative))\t%(color:blue)%(subject)%(color:reset)' --color=$(__fzf_git_color) | column -ts$'\t'
+    }
+    refs() {
+      git for-each-ref "$@" --sort=-creatordate --sort=-HEAD --color=$(__fzf_git_color) --format=$'%(if:equals=refs/remotes)%(refname:rstrip=-2)%(then)%(color:magenta)remote-branch%(else)%(if:equals=refs/heads)%(refname:rstrip=-2)%(then)%(color:brightgreen)branch%(else)%(if:equals=refs/tags)%(refname:rstrip=-2)%(then)%(color:brightcyan)tag%(else)%(if:equals=refs/stash)%(refname:rstrip=-2)%(then)%(color:brightred)stash%(else)%(color:white)%(refname:rstrip=-2)%(end)%(end)%(end)%(end)\t%(color:yellow)%(refname:short) %(color:green)(%(creatordate:relative))\t%(color:blue)%(subject)%(color:reset)' | column -ts$'\t'
+    }
+    hashes() {
+      git log --date=short --format="%C(green)%C(bold)%cd %C(auto)%h%d %s (%an)" --graph --color=$(__fzf_git_color) "$@" $LIST_OPTS
+    }
+    case "$1" in
+      branches)
+        echo "$(__fzf_git_key_label "${FZF_GIT_KEY_OPEN_BROWSER:-ctrl-o}") (open in browser) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_SHOW_ALL:-alt-a}") (show all branches)"
+        echo "$(__fzf_git_key_label "${FZF_GIT_KEY_LIST_HASHES:-alt-h}") (list commit hashes)"
+        branches
+        ;;
+      all-branches)
+        echo "$(__fzf_git_key_label "${FZF_GIT_KEY_OPEN_BROWSER:-ctrl-o}") (open in browser) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_ACCEPT_WITHOUT_REMOTE:-alt-enter}") (accept without remote)"
+        echo "$(__fzf_git_key_label "${FZF_GIT_KEY_LIST_HASHES:-alt-h}") (list commit hashes)"
+        branches -a
+        ;;
+      hashes)
+        echo "$(__fzf_git_key_label "${FZF_GIT_KEY_OPEN_BROWSER:-ctrl-o}") (open in browser) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_SHOW_DIFF:-ctrl-d}") (diff) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_TOGGLE_SORT:-ctrl-s}") (toggle sort)"
+        echo "$(__fzf_git_key_label "${FZF_GIT_KEY_TOGGLE_RAW:-alt-r}") (toggle raw mode) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_LIST_FILES:-alt-f}") (list files) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_SHOW_ALL:-alt-a}") (show all hashes)"
+        hashes
+        ;;
+      all-hashes)
+        echo "$(__fzf_git_key_label "${FZF_GIT_KEY_OPEN_BROWSER:-ctrl-o}") (open in browser) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_SHOW_DIFF:-ctrl-d}") (diff)"
+        echo "$(__fzf_git_key_label "${FZF_GIT_KEY_TOGGLE_SORT:-ctrl-s}") (toggle sort) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_LIST_FILES:-alt-f}") (list files)"
+        hashes --all
+        ;;
+      refs)
+        echo "$(__fzf_git_key_label "${FZF_GIT_KEY_OPEN_BROWSER:-ctrl-o}") (open in browser) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_OPEN_EDITOR:-alt-e}") (examine in editor) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_SHOW_ALL:-alt-a}") (show all refs)"
+        refs --exclude='refs/remotes'
+        ;;
+      all-refs)
+        echo "$(__fzf_git_key_label "${FZF_GIT_KEY_OPEN_BROWSER:-ctrl-o}") (open in browser) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_OPEN_EDITOR:-alt-e}") (examine in editor) ╱ $(__fzf_git_key_label "${FZF_GIT_KEY_ACCEPT_WITHOUT_REMOTE:-alt-enter}") (accept without remote)"
+        refs
+        ;;
+      *) exit 1 ;;
+    esac
+  elif [[ $# -gt 1 ]]; then
+    set -e
+
+    branch=$(git rev-parse --abbrev-ref HEAD 2> /dev/null)
+    if [[ $branch == HEAD ]]; then
+      branch=$(git describe --exact-match --tags 2> /dev/null || git rev-parse --short HEAD)
+    fi
+
+    # Only supports GitHub for now
+    case "$1" in
+      commit)
+        hash=$(grep -o "[a-f0-9]\{7,\}" <<< "$2" | head -n 1)
+        path=/commit/$hash
+        ;;
+      branch|remote-branch)
+        branch=$(sed 's/^[* ]*//' <<< "$2" | cut -d' ' -f1)
+        remote=$(git config branch."${branch}".remote || echo 'origin')
+        branch=${branch#$remote/}
+        path=/tree/$branch
+        ;;
+      remote)
+        remote=$2
+        path=/tree/$branch
+        ;;
+      file) path=/blob/$branch/$(git rev-parse --show-prefix)$2 ;;
+      tag)  path=/releases/tag/$2 ;;
+      *)    exit 1 ;;
+    esac
+
+    remote=${remote:-$(git config branch."${branch}".remote || echo 'origin')}
+    remote_url=$(git remote get-url "$remote" 2> /dev/null || echo "$remote")
+
+    if [[ $remote_url =~ ^git@ ]]; then
+      url=${remote_url%.git}
+      url=${url#git@}
+      url=https://${url/://}
+    elif [[ $remote_url =~ ^http ]]; then
+      url=${remote_url%.git}
+    fi
+
+    case "$OSTYPE" in
+      darwin*)
+        open "$url$path"
+        ;;
+      msys)
+        # Git-Bash on Windows
+        start "$url$path"
+        ;;
+      linux*)
+        # Handle WSL on Windows
+        if uname -a | grep -i -q Microsoft && command -v powershell.exe; then
+          powershell.exe -NoProfile start "$url$path"
+        else
+          xdg-open "$url$path"
+        fi
+        ;;
+      *)
+        # fall back to xdg-open for BSDs, etc.
+        xdg-open "$url$path"
+        ;;
+    esac
+    exit 0
+  fi
+fi
+
+if [[ $1 = --run ]]; then
+  shift
+  type=$1
+  shift
+  eval "_fzf_git_$type" "$@"
+fi

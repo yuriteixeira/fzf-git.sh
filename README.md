@@ -19,7 +19,10 @@ Installation
     * Git v2.42.0 or later is required for the `git for-each-ref` binding
 * Update your shell configuration file
     * bash or zsh
-        * Source [fzf-git.sh](https://raw.githubusercontent.com/junegunn/fzf-git.sh/main/fzf-git.sh) file from your .bashrc or .zshrc
+        * Source `fzf-git.sh` from your .bashrc or .zshrc
+* Install the two files in the same directory:
+    * `fzf-git.sh` is the library of `_fzf_git_*` functions you source
+    * `fzf-git` is the CLI it runs for listings, previews, and browser URLs
 
 Usage
 -----

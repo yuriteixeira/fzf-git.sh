@@ -1,7 +1,7 @@
 fzf-git.sh
 ==========
 
-bash, zsh, and fish key bindings for Git objects, powered by [fzf][fzf].
+bash and zsh for Git objects, powered by [fzf][fzf].
 
 <img width="1680" alt="image" src="https://user-images.githubusercontent.com/700826/185568470-20d70937-eea4-4274-aec5-14dfe7ee2de6.png">
 
@@ -20,8 +20,6 @@ Installation
 * Update your shell configuration file
     * bash or zsh
         * Source [fzf-git.sh](https://raw.githubusercontent.com/junegunn/fzf-git.sh/main/fzf-git.sh) file from your .bashrc or .zshrc
-    * fish
-        * Source [fzf-git.fish](https://raw.githubusercontent.com/junegunn/fzf-git.sh/main/fzf-git.fish) from your config.fish
 
 Usage
 -----

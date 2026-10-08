@@ -232,7 +232,7 @@ _fzf_git_check() {
 }
 
 __fzf_git=${BASH_SOURCE[0]:-${(%):-%x}}
-__fzf_git=$(readlink -f "$__fzf_git" 2> /dev/null || /usr/bin/ruby --disable-gems -e 'puts File.expand_path(ARGV.first)' "$__fzf_git" 2> /dev/null)
+__fzf_git=$(readlink -f "$__fzf_git" 2> /dev/null)
 
 _fzf_git_files() {
   local root query extract_file_name

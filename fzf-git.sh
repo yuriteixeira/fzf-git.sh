@@ -1,5 +1,6 @@
 # The MIT License (MIT)
 #
+# Copyright (c) 2026 Yuri Pereira Teixeira
 # Copyright (c) 2024 Junegunn Choi
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
